@@ -14,7 +14,7 @@ This repository is organized as follows:
   -  Source code for implementing the specification curve analysis in fMRI using [fMRI-based RSA analyses](https://elifesciences.org/articles/82580)
 - `rsa_gods/`:
   -  Code for implementing fMRI stat models using alternate pipelines on [GODS](https://www.nature.com/articles/ncomms15037)
-  -  Also includes code for performing SCA on inter-model hypothesis tests from [this](https://www.sciencedirect.com/science/article/pii/S0893608022002982)
+  -  Also includes code for performing SCA on inter-model hypothesis tests from [this paper](https://www.sciencedirect.com/science/article/pii/S0893608022002982).
 
 
 
