@@ -8,11 +8,6 @@ Computational neuromodeling methods present researchers with numerous analysis p
 
 Our work adapts Specification Curve Analysis (SCA), a principled method introduced to control for potential biases associated with degrees of freedom in psychological analyses, to neuroimaging data. We apply SCA to analysis specification choices that estimate representational dissimilarity matrices (RDMs) from fMRI and EEG activity to assess the reliability of inferences from representational similarity analysis.
 
-
--  show significant fragility across different processing pipelines
-- Model selection based on  is highly unreliable
-- We propose a decision tree analysis to supplement SCA, enabling researchers to design robust analysis pipelines for RSA with their chosen measurement modality
-
 ## Repository Structure
 This repository is organized as follows:
 - `rsa_things/`:
