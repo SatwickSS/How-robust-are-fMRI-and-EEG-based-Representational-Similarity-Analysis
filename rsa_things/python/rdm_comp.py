@@ -7,7 +7,6 @@ from os.path import join as pjoin
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-
 #creating the function for reading RDMs
 def read_RDM(bidsroot,derivname,sub_id):
     #create the directory 
