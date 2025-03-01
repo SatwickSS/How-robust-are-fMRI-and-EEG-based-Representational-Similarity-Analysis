@@ -1,4 +1,4 @@
-"""Contains helper function for RDM creation  from RDMs"""
+"""Contains helper function for RDM creation  """
 #importing the necessary nilearn masking modules
 
 from os.path import join as pjoin

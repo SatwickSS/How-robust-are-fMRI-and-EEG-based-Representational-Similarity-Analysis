@@ -1,6 +1,7 @@
 #/home/satwick22/miniconda3/envs/fmri/bin/python
 """
-Performs ICA Melodic"""
+Performs ICA Melodic
+"""
 
 import os
 from os import pardir

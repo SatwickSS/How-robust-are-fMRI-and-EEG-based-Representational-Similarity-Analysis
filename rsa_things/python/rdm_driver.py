@@ -1,4 +1,4 @@
-""" Creates RDMs"""
+""" Creates RDMs across regions from region masks and beta weights"""
 #importing the required libraries
 import os
 import numpy as np,re
@@ -162,58 +162,6 @@ def driver_test():
     save_betas(betas_dir_base,betas_roi_concat,condnames,sub_id,sessions)#will save the roi based betas 
 
 
-            
-
-
-
         
 if __name__=='__main__':
     beta_linearizer('01','betas_run01/scalematched')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    #setting the combi parameter
-    # combi=False#CRITICAL
-    # reg_ids=['FFA']#give the regid for the rois#CRITICAL#SET
-    # sub='01'#SUBJECT
-    # #setting the parameters
-    # if combi:
-    #     betas_derivname_base='betas_hrf_combi_run01'
-    #     param_combi='hrf'
-    #     param_list=list(range(11))
-    #     #calling the function
-    #     for betas_derivname in combi_driver(sub,betas_derivname_base,param_combi,param_list):
-    #         beta_linearizer(sub,betas_derivname)
-    # else:#CRITICAL
-    #     pass
-    #     #sub='01'
-    #     #betas_derivname='betas_run01/unregularized'
-    #     ##calling the function
-    #     #beta_linearizer(sub,betas_derivname)
-    # if reg_ids:
-    #     run_id='02'
-    #     roi_beta_deriv_base='betas_combi'
-    #     roi_combi_driver(sub,roi_beta_deriv_base,reg_ids,run_id)
-
-
-        
-    #outdir_base=pjoin(outpath,'ses')
-    ##saving the betas and the condition names
-    ##save_list(betas,outpath,'betas_list')
-    #save_list(condnames,outpath,'condnames_list')
-    #save_ndarray_dict(betas,outpath,'betas_dict')
-    ##creating 5 3X2 matrices having values from 0 to 30
-    ##arr_list=[(np.arange(0,6)+(i*6)) for i in range(5)]
-    ##print(custom_concat(arr_list).shape)
-    

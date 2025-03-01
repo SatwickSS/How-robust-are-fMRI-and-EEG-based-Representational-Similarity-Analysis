@@ -1,5 +1,6 @@
-#function for creating noise regressor based on the specified thresholds
-
+"""
+generating noise regressors for statistical modeling
+"""
 
 
 import os

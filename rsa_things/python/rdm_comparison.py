@@ -1,4 +1,4 @@
-"""Creates RDMs from npz"""
+"""Simple function for creating RDMs from numpy arrays"""
 #importing the necessary libraries
 
 import numpy as np
@@ -31,8 +31,6 @@ def data_grabber_rdm(
         des = {'session': re.search(r'_.+',key)[0][1:], 'subj': 1}
         measurements = value
         obs_des = {'conds': condnames[ind]}
-        #obs_des = {'conds': np.array(['cond_' + str(x) for x in np.arange(2,nCond+1)])} # indices␣˓ →from 1
-        #chn_des = {'conds': np.array(['voxel' + str(x) for x in np.arpjoin(ange(1,nVox+1)])} # indices␣˓ →from 1
         data.append(rsd.Dataset(measurements=measurements,
         descriptors=des,
         obs_descriptors=obs_des,
