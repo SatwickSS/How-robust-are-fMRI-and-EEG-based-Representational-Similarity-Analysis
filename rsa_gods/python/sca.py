@@ -561,16 +561,15 @@ def parallelizer():
 
     # Generate all combinations
     combinations = list(product(rescale_runwise_options, rescale_global_options, hrf_method_options))
-    combinations.append((None,None,None))
+    # combinations.append((None,None,None)) #use for glmsingle
     process_combination(*combinations[-1],bidsroot,betas_type)
     Parallel(n_jobs=8)(
         delayed(process_combination)(
             rescale_runwise, 
             rescale_global, 
             hrf_method, 
-            bidsroot,  # You'll need to pass this variable
-            betas_type  # You'll need to pass this variable
-        )
+            bidsroot, 
+            betas_type         )
         for rescale_runwise, rescale_global, hrf_method in tqdm(combinations, 
                                                            desc="Processing combinations",
                                                            total=len(combinations))
@@ -596,5 +595,4 @@ if __name__=='__main__':
     interesting_regions_mapping = get_interesting_regions(args.USE_ATLAS)
     bidsroot='/path/to/data/directory'
     betas_type='scalematched'
-    betas_type="glm_single"
     parallelizer()
