@@ -1,6 +1,6 @@
 
 """
-generates ICA feature maps
+generates ICA feature map and correlation plots 
 """
 #importing the necessary libararies
 import os

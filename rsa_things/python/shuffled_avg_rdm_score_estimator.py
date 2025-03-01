@@ -22,7 +22,7 @@ def rdm_roi_driver3(sub_id:str,run_id:str,n_shuffle:int,n_shuffle_offset:int=0):
     #SET A FEW THINGS EXTRA
     #n_shuffle=5#SET
     betas_fit='regularized'#SET
-    bidsroot='/scratch/satwick22/DATA1/satwick22/Documents/fMRI/thingsmri'
+    bidsroot="path/to/bidsroot"
     results={}
     #for the original sample get the RDM for the original specification
     #best_hrf_inds_by,nruns,combine_method='mean',6,'intersection'
@@ -39,7 +39,6 @@ def rdm_roi_driver3(sub_id:str,run_id:str,n_shuffle:int,n_shuffle_offset:int=0):
             sample_ind_beta=0
             
             betas_dir_base=pjoin(f'betas_roi_combi_run-{run_id}',f'{betas_fit}',f'centered_by_{data_centering_method}',f'recentered_by_{data_rescaling}',f'zscored_{int(zscore_residuals)}',f'hrf_by_{best_hrf_inds_by}_{nruns}_runs_{combine_method}') 
-            #betas_dir_base=pjoin(bidsroot,'derivatives',f'betas_roi_combi_run-{run_id}',f'{betas_fit}',f'hrf_by_{best_hrf_inds_by}_{nruns}_runs_{combine_method}')
             #for now adding the sample_index, will have to be removed later
             betas_dir=pjoin(bidsroot,'derivatives',betas_dir_base,f'sub-{sub_id}')
             #betas_dir=pjoin(betas_dir_base,f'sub-{sub_id}')
@@ -90,7 +89,6 @@ def rdm_roi_driver3(sub_id:str,run_id:str,n_shuffle:int,n_shuffle_offset:int=0):
                                 for session in range(n_sessions):
                                     #read then condnames for the session
                                     condnames=np.load(pjoin(bidsroot,'derivatives',f'betas_roi_combi_run-{run_id}','shuffle_indexes',f'sample-{sample_ind+1}',f'ses-things{session+1:02}_condnames.npy')) 
-                                    #condnames=np.load(pjoin(bidsroot,'derivatives',f'betas_roi_combi_run-{run_id}','regularized','shuffle_indexes',f'sample-{sample_ind+1}',f'ses-things{session+1:02}_condnames.npy'))#change
                                     #argsort the condnames
                                     condnames_index=np.argsort(condnames)
                                     #comp_rdm=None
@@ -99,16 +97,6 @@ def rdm_roi_driver3(sub_id:str,run_id:str,n_shuffle:int,n_shuffle_offset:int=0):
                                     #combine the specification tuple to create the dictionary key
                                     dict_key=str.join('_',specification_tup)
                                     alt_spec_dict_key=dict_key#change
-                                    #if the specification key does not exist create a dictionary agaisnt it
-                                    #if not results.get(alt_spec_dict_key):
-                                    #    results[alt_spec_dict_key]={}
-
-                                    #creating the sample dictionary if it does not exist
-                                    # if not results[alt_spec_dict_key].get(f'sample_{sample_ind+1}'):
-                                    #     results[alt_spec_dict_key][f'sample_{sample_ind+1}']={}
-                                    #if not results[alt_spec_dict_key][f'sample_{sample_ind+1}'].get(f'ses_things{session+1:02}'):
-                                     #   results[alt_spec_dict_key][f'sample_{sample_ind+1}'][f'ses_things{session+1:02}']={}
-
                                     #create the betas directory
                                     betas_dir_base=pjoin(f'betas_roi_combi_run-{run_id}',f'{betas_fit}',f'centered_by_{data_centering_method}',f'recentered_by_{data_rescaling}',f'zscored_{int(zscore_residuals)}',f'hrf_by_{best_hrf_inds_by}_{nruns}_runs_{combine_method}') 
                                     #betas_dir=
@@ -124,13 +112,6 @@ def rdm_roi_driver3(sub_id:str,run_id:str,n_shuffle:int,n_shuffle_offset:int=0):
                                     #creae the rdm_dataset_object
                                     betas_data=rsd.Dataset(measurements=betas_concat,descriptors={'session':f'ses-things{session+1:02}','subj':sub_id},obs_descriptors={'conds':condnames},channel_descriptors={'voxels':np.array(['voxel'+str(i) for i in range(betas_concat.shape[1])])})
 
-                                    #chekcing if this specification is the original specification
-                                    #if best_hrf_inds_by=='mean' and nruns==6 and combine_method=='intersection':
-                                        #create the data structure for the betas
-                                        #create the RDMs
-                                        #print('Estmating the RDMs for the original specification : for')
-                                        #print(f'sample_{sample_ind+1}:ses_things{session+1:02}:hrf_by_{best_hrf_inds_by}_{nruns}_runs_{combine_method}')
-                                        #comp_rdm=rsr.calc_rdm(betas_data,method='correlation',descriptor='conds')                            #save the RDMs
                                     rdm=rsr.calc_rdm(betas_data,method='correlation',descriptor='conds')
                                     if session:#that is for any session > 0
                                         rdm_sess_list.append(rdm)

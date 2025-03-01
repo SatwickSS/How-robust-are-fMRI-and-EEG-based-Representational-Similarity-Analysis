@@ -1,4 +1,5 @@
-
+"""
+Choksi et al 2022 code for model feature extraction"""
 import os
 import torch
 import pickle

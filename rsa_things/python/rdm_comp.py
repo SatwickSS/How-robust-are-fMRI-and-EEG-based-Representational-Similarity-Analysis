@@ -1,4 +1,4 @@
-"""Simple RDM creation funciton"""
+"""Simple RDM creation funciton from numpy arrays"""
 import numpy as np
 import pandas as pd
 import glob

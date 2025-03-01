@@ -1,5 +1,7 @@
 """
-Essential foor RDM creation"""
+Essential foor RDM creation
+Contains helper functions for running RDM creation
+"""
 import glob
 import os
 import random

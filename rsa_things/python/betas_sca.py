@@ -1,6 +1,6 @@
 
 """
-Perform SCA using specifications list
+Perform SCA using specifications list, Customized and optimized for faster processing of beta estimation stat methods
 """
 import gc
 import glob
@@ -127,9 +127,9 @@ class SingleTrialBetas(THINGSGLM):
         self.mcnc_njobs = mcnc_njobs
         self.mcnc_ddof = mcnc_ddof
         # directories and files
-        self.workdirbase='/DATA/satwick22/Documents/fMRI/fMRI_processing/python_work_dir'
+        self.workdir='path/to/workdir'
         self.workdir = pjoin(self.workdirbase, 'betas_py')
-        self.outdirbase='/DATA1/satwick22/Documents/fMRI/thingsmri'#SET
+        self.outdirbase='path/to/bidsroot/'#SET
         self.outdir = pjoin(self.outdirbase, 'derivatives', self.out_deriv_name, f'sub-{self.subject}')
         self.best_hrf_nii=pjoin(self.outdir,'best_hrf_inds.nii.gz')
         self.best_hrf_nii_base = pjoin(self.outdir, 'best_hrf_inds')
@@ -1891,7 +1891,7 @@ def driver_roi_overfit(stb_obj,run_id):
     stb_obj.roi_hrf_fit=True
     for hrf_inds_by in ['mode','mean']:
         stb_obj.best_hrf_inds_by=hrf_inds_by
-        out_derivname=pjoin(f'betas_combi_roi_run{run_id}',f'unregularized_by{self.best_hrf_inds_by}')
+        out_derivname=pjoin(f'betas_combi_roi_run{run_id}',f'unregularized_by{best_hrf_inds_by}')
         stb_obj.change_out_dir(out_derivname)
         #calling the hrf alpha overfit function
         stb_obj.hrf_alpha_overfit_rois()
@@ -1903,26 +1903,22 @@ if __name__ == '__main__':
     import sys
     from fracridge import FracRidgeRegressor
     #sub, bidsroot = sys.argv[1], sys.argv[2]
-    sub, bidsroot='01','/DATA1/satwick22/Documents/fMRI/thingsmri'
+    sub, bidsroot='01','path/to/bidsroot/'
     mask_runid='final__'
     mask_dir=pjoin(bidsroot,'derivatives',f'roi_masks_run_{mask_runid}')#SET
-    #mask_dir = pjoin('/DATA/satwick22/Documents/fMRI/fMRI_processing/thingsmri_/derivatives/masks_roi','rois','category_localizer')
     #creating a list of all ROIs
     #roi_list=['EBA','OFA','PPA','RSC','TOS','FFA','LOC']#SET
-    roi_list=['EBA','FFA']#set
+    roi_list=['EBA','FFA','PPA','LOC']#set
     #iterate through the list of ROIs
-    #creating a global variable for storing index of best fitting HRF
-    #best_hrf_inds_by_reg={}
-    #creating the stb_unreg object
-    #sub, bidsroot='01','/DATA1/satwick22/Documents/fMRI/thingsmri'
     run_id='debug2'#SET
     betas_fit='regularized'#SET
     fixed_alpha=True#SET
     flag=False
     #create the object here
     stb_unreg=SingleTrialBetas(bidsroot=bidsroot, subject=sub, out_deriv_name='betas_dummy')
-    best_frac_methods=['mean']#SET
-    best_hrf_methods=['mode']#SET
+    # best_frac_methods=['mean']#SET
+    best_frac_inds_by="mean"
+    best_hrf_methods=["mean",'mode']#SET
     n_shuffle=2#SET
     n_shuffle_offset=1#SET
     #create the empty dictionary of 12 sessions for concatenating the betas
@@ -1941,11 +1937,11 @@ if __name__ == '__main__':
             print(f'Performing the estimation for HRF estimation by {best_hrf_by}')
             for nruns in range(6,2,-1):
                 print(f'Performing the estimation for {nruns} runs')
-                for combine_method in ['intersection']:
+                for combine_method in ["union",'intersection']:
                     if nruns==6:
                         if combine_method=='union':
                             continue
-            #for best_frac_by in best_frac_methods:
+            # for best_frac_by in best_frac_methods:
                     if betas_fit=='unregularized':
                         best_hrf_inds_by=best_hrf_by
                         #best_frac_inds_by='_'

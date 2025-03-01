@@ -1,5 +1,5 @@
 
-"""Creates the intersection masks for the localizer data"""
+"""Creates the intersection masks from category localizer maps"""
 
 
 

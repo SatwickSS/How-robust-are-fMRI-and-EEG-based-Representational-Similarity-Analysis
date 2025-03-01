@@ -1,4 +1,6 @@
-"""RUNS STAT MODEL FOR BETA WEIGHT EXTRACTION"""
+"""
+Run GLM single modeling on GODS dataset
+"""
 import gc
 import glob
 import os
@@ -22,8 +24,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from sklearn.model_selection import KFold
 from tqdm import tqdm
+from glmsingle.glmsingle import GLM_single
 
-from glm import GODGLM, df_to_boxcar_design, get_nuisance_df
+from glm import GODGLM, df_to_boxcar_design, get_nuisance_df,extract_conditions,df_to_design
 from utils import pearsonr_nd, get_hrflib, spearman_brown, match_scale, apply_mask_smoothed, regress_out, r2_ndarr
 
 
@@ -76,21 +79,21 @@ class SingleTrialBetas(GODGLM):
                               '/getcanonicalhrflibrary.tsv',
             rescale_hrflib_amplitude: bool = True,
             hrflib_resolution: float = .1,
-            stim_duration: float = 9,
             overfit_hrf_model: str = 'onoff',
             fracs: np.ndarray = np.hstack([np.arange(.1, .91, .05), np.arange(.91, 1.01, .01)]),
             fmriprep_noiseregs: list = [],
-            fmriprep_compcors: bool or int = 0,
+            fmriprep_compcors: bool or int = 10,
             aroma_regressors: bool = False,
             manual_ica_regressors: bool = False,
-            nuisance_regressors: bool = False,
+            nuisance_regressors: bool = True,
             drift_model: str = 'polynomial',
             poly_order: int = 4,
             high_pass: float = None,
-            rescale_runwise_data: str = 'z',
+            rescale_runwise_data: str = 'off',
             batched_loading: bool = False,
             zscore_data_sessionwise: bool = False,
-            stims_per_ses: int = 920,
+            stimdur=9,
+
             out_dtype=np.double,
             n_parallel_hrf: int = 50,
             n_parallel_repeated_betas: int = 6,
@@ -99,7 +102,7 @@ class SingleTrialBetas(GODGLM):
     ):
         super().__init__(
             sigscale_nilearn=False, noise_model='ols', hrf_model=None, bidsroot=bidsroot, subject=subject,
-            out_deriv_name=out_deriv_name, noiseregs=fmriprep_noiseregs, acompcors=fmriprep_compcors,
+            out_deriv_name=out_deriv_name, acompcors=fmriprep_compcors,
             include_all_aroma=aroma_regressors,
             high_pass=high_pass, drift_model=drift_model, drift_order=poly_order,
         )
@@ -123,16 +126,16 @@ class SingleTrialBetas(GODGLM):
         self.n_parallel_repeated_betas = n_parallel_repeated_betas
         self.n_parallel_splithalf = n_parallel_splithalf
         self.kf = KFold(n_splits=self.n_sessions)
-        self.stims_per_ses = stims_per_ses
+        #self.stims_per_ses = stims_per_ses
         self.hrflib_url = hrflib_url
         self.hrflib = get_hrflib(self.hrflib_url)
+        self.stimdur=stimdur
         self.nsamples_hrf, self.nhrfs = self.hrflib.shape
         assert fracs[-1] == 1.  # make sure we include OLS
         self.fracs = fracs
-        self.stim_duration = stim_duration
         self.unregularized_targets = unregularized_targets
         self.nfracs = len(self.fracs)
-        assert rescale_runwise_data in ['z', 'psc', 'center']  # don't allow uncentered data
+        assert rescale_runwise_data in ['z', 'psc', 'center','off']  # don't allow uncentered data
         self.rescale_runwise_data = rescale_runwise_data
         assert overfit_hrf_model in ['onoff', 'single-trial']
         self.overfit_hrf_model = overfit_hrf_model
@@ -144,16 +147,16 @@ class SingleTrialBetas(GODGLM):
         self.rescale_hrflib_amplitude = rescale_hrflib_amplitude
         self.microtime_factor = int(self.tr / self.hrflib_resolution)  # should be 30 in our case
         self.frame_times_microtime = np.arange(0, self.ntrs * self.tr, self.hrflib_resolution) + self.stc_reftime
-        self.frame_times=np.arange(0, self.ntrs * self.tr, self.tr) + self.stc_reftime
+        self.frame_times_microtime_ = np.arange(0,self.ntrs * self.tr, self.tr) + self.stc_reftime
         self.frf = FracRidgeRegressor(fracs=1., fit_intercept=False, normalize=False)
         # mcnc settings
         self.mcnc_n_sig, self.mcnc_n_mes = mcnc_nsig, mcnc_nmes
         self.mcnc_njobs = mcnc_njobs
         self.mcnc_ddof = mcnc_ddof
         # directories and files
-        self.workdirbase='/DATA1/satwick22/Documents/fMRI/wdir/python_work_dir'
+        self.workdirbase='/DATA3/satwicky22/fMRI/wdir/python_work_dir'
         self.workdir = pjoin(self.workdirbase, 'betas_py')
-        self.outdirbase='/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids'
+        self.outdirbase='/DATA3/satwicky22/fMRI/multimodal_concepts/generic_object_decoding_bids'
         self.outdir = pjoin(self.outdirbase, 'derivatives', self.out_deriv_name, f'sub-{self.subject}')
         self.best_hrf_nii = pjoin(self.outdir, 'best_hrf_inds.nii.gz')
         self.best_frac_inds_nii = pjoin(self.outdir, 'best_frac_inds.nii.gz')
@@ -172,7 +175,9 @@ class SingleTrialBetas(GODGLM):
         """
         design_df = pd.read_csv(event_file, sep='\t')[['duration', 'onset', 'image_file', 'event_type','response_time']]
         #extract the events where the event type is rest
-        design_df.loc[design_df['event_type'] == 'rest', 'image_file'] = 'rest'
+        #drop the rows for rest events
+        design_df = design_df.loc[design_df['event_type'] != 'rest']
+        #design_df.loc[design_df['event_type'] == 'rest', 'image_file'] = 'rest'
         #rename the one back trials with 'r' at the end
         #check if the current image file is the same as the previous image file
         one_back_index=design_df['image_file']==design_df['image_file'].shift(1)
@@ -218,15 +223,68 @@ class SingleTrialBetas(GODGLM):
         convolved_designmat = convolved_ups[:, ::self.microtime_factor, :]
         return convolved_designmat
 
+
+    def create_parameter_dict(self,
+            brain_exclude:list=0,
+            want_file_outputs : list = [0,0,0,1],
+            want_memory_outputs : list = [0,0,0,1],
+            fracs : np.ndarray = None,
+            n_jobs : int = 16,
+            want_percent_bold : int = 0
+            ):
+        session_indicators = np.concatenate([np.repeat(i+1, self.nruns_perses_[self.ds.target_sessions[i]]) for i in range(self.n_sessions)])
+        if not fracs:
+            fracs = self.fracs
+        return {
+            'wantfileoutputs': want_file_outputs,
+            'wantmemoryoutputs': want_memory_outputs,
+            'sessionindicator' : session_indicators,
+            'fracs' : fracs,
+            'n_jobs' : n_jobs,
+            'wantpercentbold' : want_percent_bold,
+            'brainexclude' : brain_exclude
+        }
+    
+        
+
+
+
+
+    def make_designs_glmsingle(self,event_files):
+        """
+        make design_matrices for glmsingle 
+        """
+        design_dfs,_,_=self.make_design_dfs(event_files)
+        conditions,conditions_ordered=extract_conditions(design_dfs)
+
+        #def debug_dfs():
+        #    return [df_to_design(design_df, self.ntrs,self.tr,self.stc_reftime,conditions) 
+        #            for design_df in design_dfs[:2]]
+        #
+        with Parallel(n_jobs=-1) as parallel:
+            designmats = parallel(
+                delayed(df_to_design)(df, self.ntrs,self.tr,self.stc_reftime,conditions)
+                for df in tqdm(design_dfs, 'making single-trail design matrices')
+            ) #returns the design matrix with each conditon as a separate column with values
+
+#        designmats=debug_dfs()
+        
+
+        #filter the design matrix to fit the template for glmsingle
+        return designmats,conditions_ordered
+        
+
+
+
     def make_designs(self, event_files, normalize_convolved_regressors: bool = False):
         """
         make convolved design matrices for each event file, also return condition names per run
         and list of unique names of repeated stimuli (across all runs)
         """
         design_dfs, onoff_dfs, rep_condnames = self.make_design_dfs(event_files)#gets the design dfs and onoff dfs,where onoff dfs are just design_dfs with onoff on trial type column
-        def debug_dfs():
-            df_to_boxcar_design(design_dfs[0], self.frame_times_microtime)
-        debug_dfs()
+        #def debug_dfs():
+        #    return df_to_boxcar_design(design_dfs[0], self.frame_times_microtime)
+        #debug_mat=debug_dfs()
         with Parallel(n_jobs=-1) as parallel:
             designmats = parallel(
                 delayed(df_to_boxcar_design)(df, self.frame_times_microtime)
@@ -498,6 +556,7 @@ class SingleTrialBetas(GODGLM):
                         self.frf.fracs = self.fracs[frac_i]#setting the alpha value
                         self.frf.fit(design, data_sub) #fitting the model
                         betas_thisparam = self.frf.coef_[:nconds]
+                        n_jobs: int = 10
                     betas[voxel_inds[0]] = betas_thisparam.T
                 # save betas and condition names for this run to file
                 betas_nii = pjoin(
@@ -508,16 +567,84 @@ class SingleTrialBetas(GODGLM):
                 betas_img.to_filename(betas_nii)
                 pd.DataFrame(condnames_runs[flat_i]).to_csv(conds_tsv, sep='\t', header=['image_filename'])
 
-    def read_data(self):
-        
+    def run_glm_single(self,run_glm_single=True):
+        #read the files 
         print('\nLoading design and noise regressors\n')
         event_files, bold_files, nuisance_tsvs, masks = self.get_inputs()#returns bold_files,.... in form of list 
         self.add_union_mask(masks)#get the masks based on intersection of all masks
+        brain_exclude=self.union_mask.get_fdata().astype(np.int8).tolist()
         if not self.apply_mask:# if we do  not want masked data
             #extract the tuple for shape of the mask
             one_mask = np.ones(self.union_mask.shape,dtype=np.int8)
             self.union_mask = new_img_like(self.union_mask, one_mask)
         
+        #create the design matrices
+        design,self.conditions=self.make_designs_glmsingle(event_files)
+        if not run_glm_single:
+            return
+        if self.batched_loading:
+            print('\nLoading data\n')
+            #running the data creator from bold signal in batches
+            batch_size=20
+            data = np.vstack([self.vstack_data(bold_files[batch_i-batch_size:batch_i], rescale_runwise=self.rescale_runwise_data)
+                                         for batch_i in [i for i in range(batch_size,len(bold_files)+1,batch_size)]])
+        else:
+            data=self.vstack_data(bold_files, rescale_runwise=self.rescale_runwise_data)
+        #create the dictionary
+        param_dict=self.create_parameter_dict()
+
+        #initialize the glm-single object
+        glm_single_obj=GLM_single(param_dict)
+        #fit the model
+        #specify the necessary variables for fit
+        glm_single_obj.fit(design,data,self.stimdur,self.tr,outputdir=self.outdir)
+
+        
+    def save_result(self,in_dir):
+        results_dir=pjoin(in_dir,'TYPED_FITHRF_GLMDENOISE_RR.npy')
+        results=np.load(results_dir,allow_pickle=True).item()
+        #results=np.load('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids/derivatives/betas_run-03/glm_single/sub-03/TYPED_FITHRF_GLMDENOISE_RR.npy',allow_pickle=True).item()
+        betas_array=results['betasmd']
+        conditions=self.conditions
+        n_trials_per_run=int(betas_array.shape[-1]/self.nruns_total)
+        #iterate through each session and extract the conditions
+        start_run_ind,stop_run_ind=0,n_trials_per_run #since there are 55 conditions in each run
+        for ses_i in range(self.n_sessions):
+            sesdir = pjoin(self.outdir, f'ses-{self.target_session}{ses_i + 1:02d}')
+            if not os.path.exists(sesdir):
+                os.makedirs(sesdir)
+            for run_i in range(self.nruns_perses_[self.ds.target_sessions[ses_i]]):
+                #extract the data for the current run
+                beta_run=betas_array[:,:,:,start_run_ind:stop_run_ind]
+                #fill the betas with 0 wherever there is nan
+                beta_run=np.nan_to_num(beta_run).astype(self.out_dtype)
+                run_condition=conditions[start_run_ind:stop_run_ind]
+
+                #create the filenames
+
+                betas_nii = pjoin(
+                    sesdir, f'sub-{self.subject}_ses-{self.target_session}{ses_i + 1:02d}_run-{run_i + 1:02d}_betas.nii.gz'
+                )
+                conds_tsv = betas_nii.replace('_betas.nii.gz', '_conditions.tsv')
+                #create the beta img
+                betas_img=new_img_like(self.union_mask,beta_run)
+                #betas_img=unmask(beta_run.T.astype(self.out_dtype),self.union_mask)
+                betas_img.to_filename(betas_nii)
+                #save the condition file
+                pd.DataFrame(run_condition).to_csv(conds_tsv, sep='\t', header=['image_filename'])
+                start_run_ind+=n_trials_per_run
+                stop_run_ind+=n_trials_per_run
+
+
+
+                
+
+
+
+
+        
+
+
 
     #@profile
     def run(self):
@@ -673,7 +800,7 @@ def overfit_hrf_to_chunk(data, convolved_designs, noise_mats, nvoxmasked, nhrfs,
 def load_betas(
         sub: str,
         glm_obj : GODGLM,
-        bidsroot: str = '/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids',
+        bidsroot: str = '/DATA3/satwicky22/fMRI/multimodal_concepts/generic_object_decoding_bids',
         betas_derivname: str = None,
         smoothing=0.,
         dtype=np.single,
@@ -713,11 +840,11 @@ def match_nnslope(reg, unreg):
 
 def posthoc_scaling(
         sub='01',
-        bidsroot='/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids',
+        bidsroot='/DATA3/satwicky22/fMRI/multimodal_concepts/generic_object_decoding_bids',
         outdirbase='betas_run-test',
         out_derivname='scalematched',
         njobs=30,
-        nconds=56,
+        nconds=55,
         method: str = 'ols',
         masking: bool = False
 ):
@@ -788,15 +915,24 @@ def posthoc_scaling(
 
 if __name__=='__main__':
     import sys
-    betas_type="regularized"#specify which one to use , for scalemathed have to performn posthoc scaling psot estimation of regularized
-    #sub, bidsroot = sys.argv[1], sys.argv[2]
-    for sub_id in range(0,5):
+    for sub_id in range(2,6):
         sub=f'0{sub_id}'
-        bidsroot='/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids'
-        #get an unregularized estimate of responses
-        stb_unreg = SingleTrialBetas(bidsroot=bidsroot, subject=sub, out_deriv_name='betas_run-02/betas_type',nuisance_regressors=True)
-        stb_unreg.run()
-    ## get a regularized estimate of responses
-    #stb_reg = SingleTrialBetas(bidsroot=bidsroot, subject=sub, out_deriv_name='betas_run-02/regularized',nuisance_regressors=True)
-    #stb_reg.run()
-    #posthoc_scaling(sub=sub, bidsroot=bidsroot, outdirbase='betas_run-02',out_derivname='scalematched')
+    #sub = '05'
+        bidsroot='/DATA3/satwicky22/fMRI/multimodal_concepts/generic_object_decoding_bids'
+        in_dir="/DATA3/satwicky22/param_backup/satwick22/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids/derivatives/betas_run-03/glm_single/glm_single"
+    #get an unregularized estimate of responses
+
+
+        stb_obj = SingleTrialBetas(bidsroot=bidsroot, subject=sub, out_deriv_name='betas_sca_v2/glm_single')
+        stb_obj.run_glm_single(run_glm_single=False)
+        stb_obj.save_result(pjoin(in_dir,f"sub-{sub}"))
+#
+#
+        #stb_unreg = SingleTrialBetas(bidsroot=bidsroot, subject=sub, out_deriv_name='betas_run-05/unregularized',cv_scheme='unregularized')
+        #stb_unreg.run()
+        ##del stb_unreg
+        ##gc.collect()
+        #stb_reg = SingleTrialBetas(bidsroot=bidsroot, subject=sub, out_deriv_name='betas_run-05/regularized')
+        
+        #stb_reg.run()
+        #posthoc_scaling(sub=sub, bidsroot=bidsroot, outdirbase='betas_run-05',out_derivname='scalematched')

@@ -2,7 +2,7 @@
 
 #importing the necessary libraries and modules
 """
-Creates RDM"""
+Creates RDM from nifti files"""
 
 import os
 import numpy as np

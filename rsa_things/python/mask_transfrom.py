@@ -1,4 +1,4 @@
-"""For transforming mask across templates"""
+"""For transforming mask across templates, and creating union or intersection masks"""
 from os.path import join as pjoin
 import numpy as np
 import pandas as pd
