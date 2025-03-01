@@ -12,6 +12,8 @@ Our work adapts Specification Curve Analysis (SCA), a principled method introduc
 This repository is organized as follows:
 - `rsa_things/`:
   -  Source code for implementing the specification curve analysis in fMRI using [fMRI-based RSA analyses](https://elifesciences.org/articles/82580)
+- `rsa_thingsEEG1/`:
+  -  Source code for implementing the specification curve analysis in EEG using [EEG-based RSA analyses]((https://www.nature.com/articles/s41597-021-01102-7))
 - `rsa_gods/`:
   -  Code for implementing fMRI stat models using alternate pipelines on [GODS](https://www.nature.com/articles/ncomms15037)
   -  Also includes code for performing SCA on inter-model hypothesis tests from [this paper](https://www.sciencedirect.com/science/article/pii/S0893608022002982).
