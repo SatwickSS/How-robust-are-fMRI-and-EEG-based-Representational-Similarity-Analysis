@@ -1,4 +1,4 @@
-"""creating rdm from the estimated beta weights
+"""creating rdm from the estimated beta weights in nifti format
 """
 
 import os
@@ -107,35 +107,7 @@ class RDM:
                 betas_dict[f'{run_i+1:02d}']=betas_sorted 
 
 
-            #conditions=pd.concat(conditionfiles)
-            ##drop the rows for rest condition
-            ##create the boolea mask for rest condition
-            #rest_mask=conditions['image_filename']=='rest'
-            ##create the boolean mask for imagefile names ending with r.JPEG
-            #r_mask=conditions['image_filename'].str.endswith('r.JPEG')
-            ##combine the masks
-            #mask=rest_mask | r_mask
-            ##extract the rows from the beta matrix
-            #betas=betas[~mask]
-            ##extract the rows from the condition files
-            #conditions=conditions.loc[~mask,'image_filename']
-
-            ##for each session segregate the condiitions and the betas into a dictionary
-            ##extract the number of unique conditions
-            #unique_conditions=conditions.unique()
-            #for ses_i in range(glm_obj.n_sessions):
-            #    start_index,end_index=unique_conditions.shape[0]*ses_i,unique_conditions.shape[0]*(ses_i+1)
-            #    #extract the conditions
-            #    conditions_ses=conditions.iloc[start_index:end_index].to_numpy()
-            #    #extract the sorted condition index
-            #    conditions_sorted_index=np.argsort(conditions_ses)
-            #    #sort the conditioms
-            #    conditions_sorted=conditions_ses[conditions_sorted_index]
-            #    #sort the betas
-            #    betas_sorted=betas[start_index:end_index][conditions_sorted_index]
-            #    conditions_dict[f'{self.glmobj.target_session}{ses_i+1:02d}']=conditions_sorted
-            #    #sort
-            #    betas_dict[f'{self.glmobj.target_session}{ses_i+1:02d}']=betas_sorted
+            
             return betas_dict,conditions_dict  # shape (ntrials, nvoxel)
         #load the betas
         self.betas,self.conditions=load_betas(self.sub_id,self.glmobj,betas_type=betas_type,template=self.template)
@@ -181,30 +153,6 @@ class RDM:
 
         
         
-        #return
-        ##extract the condition files
-        #condition_files=glob.glob(pjoin(betas_dir,f'sub-{sub}','ses-perceptionTest-avg','*.tsv'))
-        ##extract the beta files
-        #beta_data=[load_img(bf).get_fdata() for bf in beta_files]
-        ##extract the condition files
-        #conditions=[pd.read_csv(cf,sep='\t')['image_filename'].to_numpy() for cf in condition_files]
-        ##extract the condition names
-        #condition_names=np.array([os.path.basename(cf).replace('_conditions.tsv','') for cf in condition_files])
-        ##sort the condition names
-        #condition_names_sorted=np.sort(condition_names)
-        ##sort the condition indexes
-        #condition_names_sort_index=np.argsort(condition_names)
-        ##sort the conditions
-        #conditions_sorted=[conditions[ind] for ind in condition_names_sort_index]
-        ##sort the betas
-        #beta_data_sorted=[beta_data[ind] for ind in condition_names_sort_index]
-        ##create the dataset object
-        #rdm_dataset=rsd.Dataset(measurements=beta_data_sorted,descriptors={'session':'perceptionTest-avg','subj':sub},obs_descriptors={'conds':conditions_sorted})
-        ##calculate the rdm
-        #rdm=rsr.calc_rdm(rdm_dataset,method='correlation',descriptor='conds')
-        #self.rdms['perceptionTest-avg']=rdm
-        #return rdm
-
 
     def save_rdm(self,rdm_dir=None,og=False,rdm=None):
         if og:
@@ -259,24 +207,6 @@ if __name__ == '__main__':
         rdm.beta_reader(derivname,template='MNI305')
         rdm.create_RDM(dist_method='euclidean')
         rdm.save_rdm()
-    #sub_og_rdm=rdm1.create_RDM_from_og('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids/derivatives/betas_run-03/original','05',dist_method='euclidean')
-    #rdm1.save_rdm()
-    #rdm2 = RDM('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids','05','betas_run-03',prepdir=prepdir)
-    #rdm2.beta_reader('glm_single',template='')
-    #rdm2.create_RDM(dist_method='euclidean')
-    #rdm2.save_rdm()
-    #rdm3= RDM('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids','03','betas_run-02',prepdir=prepdir)
-    #rdm3.beta_reader(derivname,template='')
-    #rdm3.create_RDM(dist_method='euclidean')
-    #rdm3.save_rdm()
-    #rdm4=RDM('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids','04','betas_run-02',prepdir=prepdir)
-    #rdm4.beta_reader(derivname,template='')
-    #rdm4.create_RDM(dist_method='euclidean')
-    #rdm4.save_rdm()
-    #rdm5= RDM('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids','05','betas_run-02',prepdir=prepdir)
-    #rdm5.beta_reader(derivname,template='')
-    #rdm5.create_RDM(dist_method='euclidean')
-    #rdm5.save_rdm()
     pass
 ##
 #

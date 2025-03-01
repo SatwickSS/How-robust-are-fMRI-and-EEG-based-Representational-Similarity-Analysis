@@ -1,4 +1,6 @@
-
+"""
+For comparing two RDMs 
+"""
 import numpy as np
 import pandas as pd
 import glob
@@ -45,11 +47,5 @@ if __name__=='__main__':
     for sub in range(1,6):
         sub_id=f'{sub:02d}'
         scalematched_rdms_.append(read_RDM('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids',derivname,sub_id,template='MNI305'))
-    #extract the glm single rdms for the subjects
-    #glmsingle_rdms=[]
-    #derivname='betas_run-03/glm_single'
-    #for sub in range(1,6):
-    #    sub_id=f'{sub:02d}'
-    #    glmsingle_rdms.append(read_RDM('/DATA1/satwick22/Documents/fMRI/multimodal_concepts/generic_object_decoding_bids',derivname,sub_id))
 
     pass
