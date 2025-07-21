@@ -1,431 +1,261 @@
-
 function perform_sca(subjects)
-    % Takes input a list of subjects. 
-    % eg: perform_sca([1,2,3,4,5])
+    % USAGE:
+    %   perform_sca([1,2,3,4,5])
+    %
+    % INPUT:
+    %   subjects: A row vector of subject IDs to be included in the analysis.
+    %             Example: [1,2,3,4,5]
 
-    addpath('../../CoSMoMVPA/mvpa'); 
-
-    %% Define parameters 
-    lobes = {'frontal', 'central', 'temporal', 'parietal_occipital'};  % Brain regions
-    k_values = [1:10];  % k-values
-    nSubs = numel(subjects);  % Number of subjects
-    nK = numel(k_values);  % Number of k-values
-    nShuf = 10;  % Number of shuffle iterations
-
-    %% initialize storage structures
-
-    rdm_ori = struct();
-    rdm_k = struct();
-    rdm_k_shuf = struct();
-    rdm_spec = struct();
-    rdm_shuf = struct();
-    %% Load original and spec data for each subject at 200 ms
-
-    for sub = subjects
-        fprintf('Processing subject %02i...\n', sub);
-        
-        % Load original data for subject
-        fn_ori = sprintf('../../derivatives/rdms/sub%02i/sub-%02i_rdm_test_images_k01.mat', sub, sub);
-        fprintf('Loading original data: %s\n', fn_ori);
-        data_ori = load(fn_ori, 'res');
-        % rdm_ori.(sprintf('sub%02i', sub)) = max(data_ori.res.samples, [], 2);
-        rdm_ori.(sprintf('sub%02i', sub)) = data_ori.res.samples(:,200); 
-        
-        % Load spec data for subject
-        for k = k_values
-
-            kval = sprintf('k%02i', k);
-
-            fn_k = sprintf('../../derivatives/rdms/sub%02i/sub-%02i_rdm_test_images_k%02i.mat', sub, sub, k); 
-            fprintf('Loading spec(k) data: %s\n', fn_k);
-            data_k = load(fn_k, 'res');
-            % rdm_k.(sprintf('sub%02i', sub)).(kval) = max(data_k.res.samples, [], 2);
-            rdm_k.(sprintf('sub%02i', sub)).(kval) = data_k.res.samples(:,200); %both 200ms and max give similar results
+    %% --- Configuration ---
+    fprintf('--- CONFIGURING ANALYSIS PARAMETERS ---\n');
     
-
-            fn_spec = sprintf('../../derivatives/lobes/sub%02i/sub-%02i_rdm_test_images_lobes_k%02i.mat', sub, sub, k);
-            fprintf('Loading spec data: %s\n', fn_spec);
-            data_spec = load(fn_spec, 'res');
-            for i = 1:4  % Loop over lobes
-                lobename = lobes{i};
-                % rdm_spec.(sprintf('sub%02i', sub)).(kval).(lobename) = max(data_spec.res.(lobename).samples, [], 2);
-                rdm_spec.(sprintf('sub%02i', sub)).(kval).(lobename) = data_spec.res.(lobename).samples(:,200); %both 200ms and max give similar results
-            end
-            
-            % Load shuffled data for subject, k, and shuffle (shuf=1 to shuf=5)
-            for shuf = 1:nShuf
-
-                fn_k_shuf = sprintf('../../derivatives/rdms_shuffle/shuf_%02i/k_%02i/sub-%02i_rdm_test_images_k%02i.mat', shuf, k, sub, k);
-                fprintf('Loading shuffled(k) data: %s\n', fn_k_shuf);
-                data_k_shuf = load(fn_k_shuf, 'res');
-                shufnamek = sprintf('shuf_%02i', shuf);
-                % rdm_k_shuf.(sprintf('sub%02i', sub)).(shufnamek).(kval) = max(data_k_shuf.res.samples, [], 2);
-                rdm_k_shuf.(sprintf('sub%02i', sub)).(shufnamek).(kval) = data_k_shuf.res.samples(:,200);
-
-
-                fn_shuf = sprintf('.../../derivatives/lobes_shuffle/sub%02i/sub-%02i_rdm_test_images_lobes_s%02i_k%02i.mat', sub, sub, shuf, k);
-                fprintf('Loading shuffled data: %s\n', fn_shuf);
-                data_shuf = load(fn_shuf, 'res');
-                shufname = sprintf('shuf_%02i', shuf);
-                for i = 1:4  % Loop over lobes
-                    lobename = lobes{i};
-                    % rdm_shuf.(sprintf('sub%02i', sub)).(shufname).(kval).(lobename) = max(data_shuf.res.(lobename).samples, [], 2);
-                    rdm_shuf.(sprintf('sub%02i', sub)).(shufname).(kval).(lobename) = data_shuf.res.(lobename).samples(:,200);
-                end
-            end
-
-
-        end
-    end
-    %%
-
-    save('../../results/rdm_ori_new.mat', 'rdm_ori');
-    save('../../results/rdm_k_new.mat', 'rdm_k');
-    save('../../results/rdm_k_shuf_new.mat', 'rdm_k_shuf');
-    save('../../results/rdm_spec_new.mat', 'rdm_spec');
-    save('../../results/rdm_shuf_new.mat', 'rdm_shuf');
-
-
-    %% Calculate Kendall's Tau correlation between original and spec data
-
-
-    tau_ori_k = struct();
-    p_values_ori_k = struct();
-
-    tau_ori_shuf_k = struct();
-    p_values_ori_shuf_k = struct();
-
-    tau_ori_spec = struct();
-    p_values_ori_spec = struct();
-
-    tau_ori_shuf = struct();
-    p_values_ori_shuf = struct();
-
+    % Add CoSMoMVPA to path using relative path
+    addpath('../../tools/CoSMoMVPA/mvpa');
+    
+    % --- Key Analysis Parameters ---
+    lobes = {'whole_brain', 'frontal', 'central', 'temporal', 'parietal_occipital'};
+    k_values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    nShuf = 10;
+    time_specs = {150, 200, 250, 300, 'average'};
+    avg_window_ms = [0, 996];
+    
+    % --- Path Configuration (using hard-coded relative paths) ---
+    base_path_nck = '../../derivatives/rdms/';
+    base_path_k_shuf = '../../derivatives/rdms_shuffle/';
+    base_path_lobe_ori = '../../derivatives/lobes/';
+    base_path_lobe_shuf = '../../derivatives/lobes_shuffle/';
+    save_path = '../../results/sca_single_reference_results/';
+    
+    fprintf('  Subjects to process: %s\n', mat2str(subjects));
+    fprintf('  Results will be saved to: %s\n', save_path);
+    if ~exist(save_path, 'dir'), fprintf('  Save directory not found. Creating it...\n'); mkdir(save_path); end
+    
+    %% PHASE 1: Load the SINGLE Reference RDM (Whole Brain, k=1, 200ms)
+    fprintf('\n--- PHASE 1: Loading the single reference RDM for all subjects ---\n');
+    ref_rdm = struct();
     for sub = subjects
-        fprintf('Processing subject %02i...\n', sub);
+        fprintf('  Loading reference for Subject %02i...\n', sub);
+        fn_ref = fullfile(base_path_nck, sprintf('sub%02i/sub-%02i_rdm_test_images_k01.mat', sub, sub));
+        data_ref = load(fn_ref, 'res');
+        time_axis = data_ref.res.a.fdim.values{1};
+        ref_rdm.(sprintf('sub%02i', sub)) = extract_rdm_at_time(data_ref, 200, time_axis, avg_window_ms);
+    end
+    fprintf('--- Reference RDM loaded successfully. ---\n');
+    
+    %% PHASE 2: Load ALL Specification RDMs (Real and Shuffled)
+    fprintf('\n--- PHASE 2: Loading all specification RDMs (this may take time) ---\n');
+    all_spec_rdms = struct();
+    all_shuf_rdms = struct();
+    
+    for t_idx = 1:numel(time_specs)
+        current_time_spec = time_specs{t_idx};
+        if isnumeric(current_time_spec)
+            time_field = sprintf('t%dms', current_time_spec);
+        else
+            time_field = 't_avg';
+        end
         
-        for k = k_values
-            kval = sprintf('k%02i', k);
-
-            [tau_ori_k.(sprintf('sub%02i', sub)).(kval), p_values_ori_k.(sprintf('sub%02i', sub)).(kval)] = corr(rdm_ori.(sprintf('sub%02i', sub))(:), rdm_k.(sprintf('sub%02i', sub)).(kval)(:), 'type', 'Kendall');
-
-
-            for i = 1:4
-                lobename = lobes{i};
-                [tau_ori_spec.(sprintf('sub%02i', sub)).(sprintf('%s_%s', kval, lobename)), p_values_ori_spec.(sprintf('sub%02i', sub)).(sprintf('%s_%s', kval, lobename))] = corr(rdm_ori.(sprintf('sub%02i', sub))(:), rdm_spec.(sprintf('sub%02i', sub)).(kval).(lobename)(:), 'type', 'Kendall');
-            end
-
-            for shuf = 1:nShuf
-                shufname = sprintf('shuf_%02i', shuf);
-                [tau_ori_shuf_k.(sprintf('sub%02i', sub)).(shufname).(kval), p_values_ori_shuf_k.(sprintf('sub%02i', sub)).(shufname).(kval)] = corr(rdm_ori.(sprintf('sub%02i', sub))(:), rdm_k_shuf.(sprintf('sub%02i', sub)).(shufname).(kval)(:), 'type', 'Kendall');
-                for i = 1:4
-                    lobename = lobes{i};
-                    [tau_ori_shuf.(sprintf('sub%02i', sub)).(shufname).(sprintf('%s_%s', kval, lobename)), p_values_ori_shuf.(sprintf('sub%02i', sub)).(shufname).(sprintf('%s_%s', kval, lobename))] = corr(rdm_ori.(sprintf('sub%02i', sub))(:), rdm_shuf.(sprintf('sub%02i', sub)).(shufname).(kval).(lobename)(:), 'type', 'Kendall');
+        fprintf('  Processing Time Spec: %s\n', time_field);
+        for l_idx = 1:numel(lobes)
+            current_lobe = lobes{l_idx};
+            fprintf('    Processing Lobe: %s\n', current_lobe);
+            for k_idx = 1:numel(k_values)
+                current_k = k_values(k_idx);
+                
+                if strcmp(current_lobe, 'whole_brain') && current_k == 1 && isnumeric(current_time_spec) && current_time_spec == 200
+                    fprintf('      Skipping whole_brain, k=1, 200ms, as it is the reference specification.\n');
+                    continue;
+                end
+                
+                spec_name = sprintf('%s_k%02d_%s', current_lobe, current_k, time_field);
+                fprintf('      Processing Specification: %s\n', spec_name);
+                
+                for sub = subjects
+                    subj_field = sprintf('sub%02i', sub);
+                    
+                    % Load real spec RDM
+                    if strcmp(current_lobe, 'whole_brain')
+                        fn_spec = fullfile(base_path_nck, sprintf('sub%02i/sub-%02i_rdm_test_images_k%02i.mat', sub, sub, current_k));
+                        data_spec = load(fn_spec, 'res');
+                        time_axis = data_spec.res.a.fdim.values{1};
+                        all_spec_rdms.(subj_field).(spec_name) = extract_rdm_at_time(data_spec, current_time_spec, time_axis, avg_window_ms);
+                    else
+                        fn_spec = fullfile(base_path_lobe_ori, sprintf('sub%02i/sub-%02i_rdm_test_images_lobes_k%02i.mat', sub, sub, current_k));
+                        data_spec = load(fn_spec, 'res');
+                        temp_struct = struct(); temp_struct.res = data_spec.res.(current_lobe);
+                        time_axis = temp_struct.res.a.fdim.values{1};
+                        all_spec_rdms.(subj_field).(spec_name) = extract_rdm_at_time(temp_struct, current_time_spec, time_axis, avg_window_ms);
+                    end
+                    
+                    % Load shuffled spec RDMs
+                    all_shuf_rdms.(subj_field).(spec_name) = cell(nShuf, 1);
+                    for shuf = 1:nShuf
+                        if strcmp(current_lobe, 'whole_brain')
+                            fn_shuf = fullfile(base_path_k_shuf, sprintf('shuf_%02i/k_%02i/sub-%02i_rdm_test_images_k%02i.mat', shuf, current_k, sub, current_k));
+                            data_shuf = load(fn_shuf, 'res');
+                            time_axis = data_shuf.res.a.fdim.values{1};
+                            all_shuf_rdms.(subj_field).(spec_name){shuf} = extract_rdm_at_time(data_shuf, current_time_spec, time_axis, avg_window_ms);
+                        else
+                            fn_shuf = fullfile(base_path_lobe_shuf, sprintf('sub%02i/sub-%02i_rdm_test_images_lobes_s%02i_k%02i.mat', sub, sub, shuf, current_k));
+                            data_shuf = load(fn_shuf, 'res');
+                            temp_struct_shuf = struct(); temp_struct_shuf.res = data_shuf.res.(current_lobe);
+                            time_axis = temp_struct_shuf.res.a.fdim.values{1};
+                            all_shuf_rdms.(subj_field).(spec_name){shuf} = extract_rdm_at_time(temp_struct_shuf, current_time_spec, time_axis, avg_window_ms);
+                        end
+                    end
                 end
             end
-
         end
     end
-
-    save('../../results/tau_ori_k_new.mat', 'tau_ori_k');
-    save('../../results/p_values_ori_k_new.mat', 'p_values_ori_k');
-
-    save('../../results/tau_ori_shuf_k_new.mat', 'tau_ori_shuf_k');
-    save('../../results/p_values_ori_shuf_k_new.mat', 'p_values_ori_shuf_k');
-
-    save('../../results/tau_ori_spec_new.mat', 'tau_ori_spec');
-    save('../../results/p_values_ori_spec_new.mat', 'p_values_ori_spec');
-
-    save('../../results/tau_ori_shuf_new.mat', 'tau_ori_shuf');
-    save('../../results/p_values_ori_shuf_new.mat', 'p_values_ori_shuf');
-
-
-
-    %% Calculate percentile of tau values
-
-    % Initialize structure to store percentiles
-    percentile_ori_vs_shuf = struct();
-    percentile_k_vs_kshuf = struct();
-
+    fprintf('--- All specification RDMs loaded successfully. ---\n');
+    
+    
+    %% PHASE 3: Calculate All Correlations (Real and Shuffled)
+    fprintf('\n--- PHASE 3: Calculating all subject-level correlations ---\n');
+    all_tau_values = struct();
+    all_shuf_tau_distributions = struct();
+    spec_names = fieldnames(all_spec_rdms.(sprintf('sub%02i', subjects(1))));
+    
     for sub = subjects
         subj_field = sprintf('sub%02i', sub);
-        for k = k_values
-            kval = sprintf('k%02i', k);
-
-            % Collect tau values from all shuffle iterations for rdm_k and rdm_k_shuf
-
-            tau_ori_kvalue = tau_ori_k.(subj_field).(kval);
-            tau_shuf_kvalue = zeros(nShuf, 1);
-
+        fprintf('  Processing correlations for Subject %s\n', subj_field);
+        for i_spec = 1:numel(spec_names)
+            spec_name = spec_names{i_spec};
+            
+            all_tau_values.(subj_field).(spec_name) = corr(ref_rdm.(subj_field), all_spec_rdms.(subj_field).(spec_name), 'type', 'Kendall');
+            
+            shuf_taus = zeros(nShuf, 1);
             for shuf = 1:nShuf
-                shufname = sprintf('shuf_%02i', shuf);
-                tau_shuf_kvalue(shuf) = tau_ori_shuf_k.(subj_field).(shufname).(kval);
+                shuf_taus(shuf) = corr(ref_rdm.(subj_field), all_shuf_rdms.(subj_field).(spec_name){shuf}, 'type', 'Kendall');
             end
-
-            % Calculate the percentile of tau_ori relative to the shuffled taus.    
-            percentile = sum(tau_shuf_kvalue < tau_ori_kvalue) / nShuf * 100;
-
-            % Store the result
-
-            percentile_k_vs_kshuf.(subj_field).(kval) = percentile;
-
-            for i = 1:length(lobes)
-                lobename = lobes{i};
-                
-                % Get the original tau for this specification
-                tau_ori = tau_ori_spec.(subj_field).(sprintf('%s_%s', kval, lobename));
-                
-                % Collect tau values from all shuffle iterations for this subject/specification
-                tau_shuf_vals = zeros(nShuf, 1);
-                for shuf = 1:nShuf
-                    shufname = sprintf('shuf_%02i', shuf);
-                    tau_shuf_vals(shuf) = tau_ori_shuf.(subj_field).(shufname).(sprintf('%s_%s', kval, lobename));
-                end
-                
-                % Calculate the percentile of tau_ori relative to the shuffled taus.
-                % This is the fraction of shuffled taus that are less than tau_ori, multiplied by 100.
-                percentile = sum(tau_shuf_vals < tau_ori) / nShuf * 100;
-                
-                % Store the result
-                percentile_ori_vs_shuf.(subj_field).(sprintf('%s_%s', kval, lobename)) = percentile;
-            end
+            all_shuf_tau_distributions.(subj_field).(spec_name) = shuf_taus;
         end
     end
-
-
-    save('../../results/percentile_k_vs_kshuf_new.mat', 'percentile_k_vs_kshuf');
-    save('../../results/percentile_ori_vs_shuf_new.mat', 'percentile_ori_vs_shuf');
-
-    %% Calculate p-values from percentiles
-
-    % Initialize a structure to store p-values
-    p_values_ori_vs_shuf = struct();
-    p_values_k_vs_kshuf = struct();
-
-    % Loop over each subject
+    fprintf('--- All correlation calculations complete. ---\n');
+    
+    %% PHASE 4: Calculate Subject-Level P-values from Correlations (Permutation Test)
+    fprintf('\n--- PHASE 4: Performing permutation test to calculate subject-level p-values ---\n');
+    all_subject_p_values = struct();
     for sub = subjects
         subj_field = sprintf('sub%02i', sub);
-        
-        % Loop over each k-value
-        for k = k_values
-            kval = sprintf('k%02i', k);
+        fprintf('  Calculating p-values for Subject %s\n', subj_field);
+        for i_spec = 1:numel(spec_names)
+            spec_name = spec_names{i_spec};
             
-            % Get the percentile for this subject and k-value
-            percentile_k = percentile_k_vs_kshuf.(subj_field).(kval);
-
-            % Calculate the p-value
-            p_value_k = 2 * min((1 - (percentile_k / 100)),(percentile_k / 100));
-
-            % Store the p-value in the structure
-            p_values_k_vs_kshuf.(subj_field).(kval) = p_value_k;
+            real_tau = all_tau_values.(subj_field).(spec_name);
+            null_distribution = all_shuf_tau_distributions.(subj_field).(spec_name);
             
-
-            % Loop over each brain region (lobe)
-            for i = 1:length(lobes)
-                lobename = lobes{i};
-                
-                % Get the percentile for this subject, k-value, and lobe
-                percentile = percentile_ori_vs_shuf.(subj_field).(sprintf('%s_%s', kval, lobename));
-                
-                % Calculate the p-value
-                p_value = 2 * min((1 - (percentile / 100)),(percentile / 100));
-                
-                % Store the p-value in the structure
-                p_values_ori_vs_shuf.(subj_field).(sprintf('%s_%s', kval, lobename)) = p_value;
-            end
+            nShuffles = numel(null_distribution);
+            percentile = sum(null_distribution < real_tau) / nShuffles * 100;
+            p_val = 2 * min((1 - percentile/100), (percentile/100));
+            
+            all_subject_p_values.(subj_field).(spec_name) = p_val;
         end
     end
-
-    %% save the p-values
-    save('../../results/p_values_k_vs_kshuf_new.mat', 'p_values_k_vs_kshuf');
-    save('../../results/p_values_ori_vs_shuf_new.mat', 'p_values_ori_vs_shuf');
-
-
-    %%
-
-    %% Combine p values using Fisher's and Stouffer's methods
-    % Initialize structures to store combined p-values
-    combined_p_values_fisher = struct();
-    combined_p_values_stouffer = struct();
-
-    combined_p_values_fisher_k = struct();
-    combined_p_values_stouffer_k = struct();
-
-
-
-    % Loop over each k-value
-    for k = k_values
-        kval = sprintf('k%02i', k);
-
-        % Collect p-values for all subjects for this k-value
-        p_valuesk = [];
+    fprintf('--- All subject-level p-value calculations complete. ---\n');
+    
+    %% PHASE 5: Group-level aggregation, Plotting, and Saving
+    fprintf('\n--- PHASE 5: Aggregating to group-level, plotting, and saving all results ---\n');
+    group_p_fisher = struct();
+    group_p_stouffer = struct();
+    
+    fprintf('  Step 5.1: Aggregating p-values to group level...\n');
+    for i_spec = 1:numel(spec_names)
+        spec_name = spec_names{i_spec};
+        
+        p_vals_across_subs = [];
         for sub = subjects
-            subj_field = sprintf('sub%02i', sub);
-            p_valuesk = [p_valuesk; p_values_k_vs_kshuf.(subj_field).(kval)];
+            p_vals_across_subs = [p_vals_across_subs; all_subject_p_values.(sprintf('sub%02i', sub)).(spec_name)];
         end
-
-        % Fisher's method to combine p-values
-        chi2_statk = -2 * sum(log(p_valuesk));  % Chi-squared statistic
-        dfk = 2 * length(p_valuesk);  % Degrees of freedom
-        combined_p_value_fisher_k = 1 - chi2cdf(chi2_statk, dfk);  % Combined p-value
-
-        % Stouffer's method to combine p-values
-        z_scoresk = norminv(1 - p_valuesk);  % Convert p-values to z-scores
-        z_combinedk = sum(z_scoresk) / sqrt(length(z_scoresk));  % Combined z-score
-        combined_p_value_stouffer_k = 1 - normcdf(z_combinedk);  % Combined p-value
-
-        % Store the combined p-values
-        combined_p_values_fisher_k.(kval) = combined_p_value_fisher_k;
-        combined_p_values_stouffer_k.(kval) = combined_p_value_stouffer_k;
         
+        p_vals_across_subs(p_vals_across_subs == 0) = eps;
+        p_vals_across_subs(p_vals_across_subs == 1) = 1 - eps;
         
-        % Loop over each brain region (lobe)
-        for i = 1:length(lobes)
-            lobename = lobes{i};
-            
-            % Collect p-values for all subjects for this k-value and lobe
-            p_values = [];
-            for sub = subjects
-                subj_field = sprintf('sub%02i', sub);
-                p_values = [p_values; p_values_ori_vs_shuf.(subj_field).(sprintf('%s_%s', kval, lobename))];
-            end
-            
-            % Fisher's method to combine p-values
-            chi2_stat = -2 * sum(log(p_values));  % Chi-squared statistic
-            df = 2 * length(p_values);  % Degrees of freedom
-            combined_p_value_fisher = 1 - chi2cdf(chi2_stat, df);  % Combined p-value
-            
-            % Stouffer's method to combine p-values
-            z_scores = norminv(1 - p_values);  % Convert p-values to z-scores
-            z_combined = sum(z_scores) / sqrt(length(z_scores));  % Combined z-score
-            combined_p_value_stouffer = 1 - normcdf(z_combined);  % Combined p-value
-            
-            % Store the combined p-values
-            combined_p_values_fisher.(kval).(lobename) = combined_p_value_fisher;
-            combined_p_values_stouffer.(kval).(lobename) = combined_p_value_stouffer;
+        chi2_stat = -2 * sum(log(p_vals_across_subs)); df = 2 * length(p_vals_across_subs);
+        group_p_fisher.(spec_name) = 1 - chi2cdf(chi2_stat, df);
+        
+        z_scores = norminv(1 - p_vals_across_subs); z_combined = sum(z_scores) / sqrt(length(z_scores));
+        group_p_stouffer.(spec_name) = 1 - normcdf(z_combined);
+    end
+    fprintf('  Group-level aggregation complete.\n');
+    
+    % Sort and Plot (using Stouffer's as the primary method for sorting)
+    fprintf('  Step 5.2: Generating final plot with specified style...\n');
+    fig = figure('Color', 'white', 'Visible', 'off');
+    p_values_for_plot = cell2mat(struct2cell(group_p_stouffer));
+    [sorted_p_values, ~] = sort(p_values_for_plot);
+    % Plot the p-values line (solid, thick blue)
+    
+    plot(sorted_p_values, 'LineWidth', 4, 'Color', [0.12, 0.47, 0.71]); % A standard blue color
+    hold on;
+    
+    % Plot the 0.025 significance level line (dashed, thick magenta)
+    plot([0, numel(sorted_p_values)+1], [0.025, 0.025], '--', 'Color', [1, 0, 1], 'LineWidth', 4);
+    
+    plot(1, sorted_p_values(1), 'o', 'MarkerSize', 15, 'MarkerFaceColor', 'red', 'MarkerEdgeColor', 'red');
+    
+    % --- Axis and Figure Styling to match the target image ---
+    ax = gca;
+    box off; % Removes the top and right axis lines
+    ax.LineWidth = 3;       % Thick axes lines
+    ax.TickDir = 'out';     % Ticks point outwards
+    ax.FontSize = 24;       % Larger font for tick labels
+    ax.FontName = 'Arial';  % Clear, sans-serif font
+    grid off;               % Ensure no grid is visible
+    
+    % Set axis limits and ticks to match the reference image
+    xlim([-5, 255]); % Give a little space on the left for the marker
+    ylim([-0.002, 0.03]); % Y-axis from slightly below 0 to 0.03
+    ax.YTick = [0.00, 0.01, 0.02];
+    ax.YTickLabel = {'0.00', '0.01', '0.02'}; % Ensure two decimal places
+    
+    % Label the axes with matching style
+    xlabel('Specifications(sorted by p-values)', 'FontSize', 28, 'FontName', 'Arial');
+    ylabel('p-values', 'FontSize', 28, 'FontName', 'Arial');
+    
+    % Add legend matching the target image
+    lgd=legend({'p-values', '0.025 significance level', 'Original Specification'}, 'Location', 'northwest', 'FontSize', 9);
+    lgd.Position=[0.20, 0.55, 0.35, 0.15]; % Adjust position to match the target image
+    hold off;
+    
+    % Save the final styled figure
+    plot_filename = fullfile(save_path, 'sca_plot_single_reference.png');
+    print(fig, plot_filename, '-dpng', '-r300');
+    close(fig);
+    fprintf('    -> plot saved successfully.\n');
+    
+    
+    
+    % Save all data structures
+    fprintf('  Step 5.3: Saving all generated data structures to a single .mat file...\n');
+    data_filename = fullfile(save_path, 'sca_full_analysis_data.mat');
+    save(data_filename, ...
+        'ref_rdm', ...
+        'all_spec_rdms', ...
+        'all_shuf_rdms', ...
+        'all_tau_values', ...
+        'all_shuf_tau_distributions', ...
+        'all_subject_p_values', ...
+        'group_p_stouffer', ...
+        'group_p_fisher', ...
+        '-v7.3');
+    fprintf('    -> Full data file saved successfully to: %s\n', data_filename);
+    
+    fprintf('\n\n--- ANALYSIS COMPLETE ---\n');
+    
+    end 
+    
+    function rdm_vector = extract_rdm_at_time(data_struct, time_spec, time_axis_ms, avg_window_ms)
+        time_axis_sec = time_axis_ms / 1000;
+        if isnumeric(time_spec)
+            time_in_sec = time_spec / 1000;
+            [~, time_idx] = min(abs(time_axis_sec - time_in_sec));
+            rdm_vector = data_struct.res.samples(:, time_idx);
+        elseif ischar(time_spec) && strcmpi(time_spec, 'average')
+            [~, start_idx] = min(abs(time_axis_sec - (avg_window_ms(1) / 1000)));
+            [~, end_idx] = min(abs(time_axis_sec - (avg_window_ms(2) / 1000)));
+            rdm_vector = mean(data_struct.res.samples(:, start_idx:end_idx), 2);
+        else
+            error('Invalid time_spec provided.');
         end
     end
-
-
-
-    %% Save the results
-    save('../../results/combined_p_values_fisher_k_new.mat', 'combined_p_values_fisher_k');
-    save('../../results/combined_p_values_stouffer_k_new.mat', 'combined_p_values_stouffer_k');
-
-    save('../../results/combined_p_values_fisher.mat', 'combined_p_values_fisher');
-    save('../../results/combined_p_values_stouffer.mat', 'combined_p_values_stouffer');
-
-    %% take out all the p values from all the combined p values and put them in a single array for plotting
-    all_p_values_fisher = [];
-    all_p_values_stouffer = [];
-
-    for k = k_values
-        kval = sprintf('k%02i', k);
-        all_p_values_fisher = [all_p_values_fisher; combined_p_values_fisher_k.(kval)];
-        all_p_values_stouffer = [all_p_values_stouffer; combined_p_values_stouffer_k.(kval)];
-        for i = 1:length(lobes)
-            lobename = lobes{i};
-            all_p_values_fisher = [all_p_values_fisher; combined_p_values_fisher.(kval).(lobename)];
-            all_p_values_stouffer = [all_p_values_stouffer; combined_p_values_stouffer.(kval).(lobename)];
-        end
-    end
-
-
-    %% PLot all_p_values_fisher in a single line plot
-
-    figure('Position', [100, 100, 800, 500], 'Color', 'white');
-
-    % Plot the p-values with a thicker blue line
-    plot(all_p_values_fisher, 'LineWidth', 2, 'Color', [0.2, 0.4, 0.8]);
-    hold on;
-
-    % Add only the 0.025 significance level with magenta dashed line
-    plot([0, length(all_p_values_fisher)], [0.025, 0.025], '--', 'Color', [1, 0, 1], 'LineWidth', 2);
-
-    % Add marker for original specification (first point)
-    plot(1, all_p_values_fisher(1), 'o', 'MarkerSize', 10, 'MarkerFaceColor', 'red', 'MarkerEdgeColor', 'red');
-
-    % Set axis limits
-    xlim([0, length(all_p_values_fisher)]);
-    ylim([-0.002, 0.025]); % Allow space below zero
-
-    % Manually draw x-axis at y = -0.0008 (slightly below 0)
-    plot([0, length(all_p_values_fisher)], [-0.0008, -0.0008], 'k-', 'LineWidth', 1.5);
-
-    % Label the axes
-    xlabel('Specifications(sorted by p-values)', 'FontSize', 14, 'FontWeight', 'bold');
-    ylabel('p-values', 'FontSize', 14, 'FontWeight', 'bold');
-
-    % Add legend
-    legend('p-values', '0.025 significance level', 'Original Specification', 'FontSize', 12);
-
-    % Remove normal axes
-    box off;
-    ax = gca;
-    ax.LineWidth = 2;
-    ax.FontSize = 12;
-    ax.XTickLabel = {};  % Hide original x-tick labels
-    set(ax, 'XColor', 'none');  % Hide the x-axis line
-
-    % Add custom x-ticks
-    for i = [0, 10, 20, 30, 40, 50]
-        text(i, -0.0015, num2str(i), 'HorizontalAlignment', 'center', 'FontSize', 12);
-    end
-
-    % Customize the y-tick marks
-    ax.YTick = [0.00, 0.01, 0.02];
-    ax.TickDir = 'out';
-
-    hold off;
-
-    print('../../results/all_p_values_fisher.png', '-dpng', '-r300');
-
-    %% PLot all_p_values_stouffer in a single line plot
-
-    figure('Position', [100, 100, 800, 500], 'Color', 'white');
-
-    % Plot the p-values with a thicker blue line
-    plot(all_p_values_stouffer, 'LineWidth', 2, 'Color', [0.2, 0.4, 0.8]);
-    hold on;
-
-    % Add only the 0.025 significance level with magenta dashed line
-    plot([0, length(all_p_values_stouffer)], [0.025, 0.025], '--', 'Color', [1, 0, 1], 'LineWidth', 2);
-
-    % Add marker for original specification (first point)
-    plot(1, all_p_values_stouffer(1), 'o', 'MarkerSize', 10, 'MarkerFaceColor', 'red', 'MarkerEdgeColor', 'red');
-
-    % Set axis limits
-    xlim([0, length(all_p_values_stouffer)]);
-    ylim([-0.002, 0.025]); % Allow space below zero
-
-    % Manually draw x-axis at y = -0.0008 (slightly below 0)
-    plot([0, length(all_p_values_stouffer)], [-0.0008, -0.0008], 'k-', 'LineWidth', 1.5);
-
-    % Label the axes
-    xlabel('Specifications(sorted by p-values)', 'FontSize', 14, 'FontWeight', 'bold');
-    ylabel('p-values', 'FontSize', 14, 'FontWeight', 'bold');
-
-    % Add legend
-    legend('p-values', '0.025 significance level', 'Original Specification', 'FontSize', 12);
-
-    % Remove normal axes
-    box off;
-    ax = gca;
-    ax.LineWidth = 2;
-    ax.FontSize = 12;
-    ax.XTickLabel = {};  % Hide original x-tick labels
-    set(ax, 'XColor', 'none');  % Hide the x-axis line
-
-    % Add custom x-ticks
-    for i = [0, 10, 20, 30, 40, 50]
-        text(i, -0.0015, num2str(i), 'HorizontalAlignment', 'center', 'FontSize', 12);
-    end
-
-    % Customize the y-tick marks
-    ax.YTick = [0.00, 0.01, 0.02];
-    ax.TickDir = 'out';
-
-    hold off;
-
-    print('../../results/all_p_values_stouffer.png', '-dpng', '-r300');
-end
